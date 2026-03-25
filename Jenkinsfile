@@ -4,6 +4,7 @@ pipeline {
     environment {
         SERVER = "192.168.10.85"
         USER = "abhi1worker"
+        REPO = "https://github.com/avikashrana63-source/attendence-project.git"
     }
 
     stages {
@@ -29,19 +30,20 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                    git branch: "${env.BRANCH_NAME}",
-                        url: 'https://github.com/avikashrana63-source/attendence-project.git'
+                    git branch: "${env.BRANCH_NAME}", url: "${REPO}"
                 }
             }
         }
 
-        stage('Build (Show Changes)') {
+        stage('Build') {
             steps {
-                echo "🔨 Building project..."
-            
-                sh "echo '===== index.html content ====='"
-                sh "cat index.html"
-                sh "echo '==============================='"
+                echo "Building project"
+
+                sh "echo '===== FILE LIST ====='"
+                sh "ls -l"
+                sh "echo '===== index.html ====='"
+                sh "cat index.html || true"
+                sh "echo '======================'"
             }
         }
 
@@ -51,7 +53,7 @@ pipeline {
 
                     if (env.BRANCH_NAME == "main") {
 
-                        echo "Deploying MAIN..."
+                        echo "Deploying MAIN"
 
                         sshagent(['server-ssh']) {
                             sh """
@@ -60,13 +62,14 @@ pipeline {
                                 mkdir -p /var/www/main &&
                                 chown -R ${USER}:${USER} /var/www/main
                             '
-                            scp index.html ${USER}@${SERVER}:/var/www/main/
+
+                            scp -r * ${USER}@${SERVER}:/var/www/main/
                             """
                         }
 
                     } else if (env.BRANCH_NAME == "dev") {
 
-                        echo " Deploying DEV..."
+                        echo "Deploying DEV"
 
                         sshagent(['server-ssh']) {
                             sh """
@@ -75,20 +78,21 @@ pipeline {
                                 mkdir -p /var/www/dev &&
                                 chown -R ${USER}:${USER} /var/www/dev
                             '
-                            scp index.html ${USER}@${SERVER}:/var/www/dev/
+
+                            scp -r * ${USER}@${SERVER}:/var/www/dev/
                             """
                         }
 
                     } else if (env.BRANCH_NAME == "prefix") {
 
-                        echo " PREFIX branch detected"
-                        echo " Build completed"
-                        echo " Changes shown above in logs"
-                        echo " Deployment skipped"
+                        echo "PREFIX branch detected"
+                        echo "Build executed successfully"
+                        echo "Changes displayed in logs"
+                        echo "Deployment skipped"
 
                     } else {
 
-                        echo " No rule for this branch"
+                        echo "No deployment rule for this branch"
                     }
                 }
             }
