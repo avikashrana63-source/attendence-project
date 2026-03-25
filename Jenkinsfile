@@ -11,70 +11,72 @@ pipeline {
         stage('Clean Workspace') {
             steps {
                 deleteDir()
-                echo "Workspace cleaned"
             }
         }
 
-        stage('Checkout Code') {
+        stage('Detect Branch from Webhook') {
             steps {
-                checkout scm
+                script {
+                    // GitHub sends branch like: refs/heads/dev
+                    def ref = env.GIT_BRANCH ?: ""
+                    echo "Raw branch: ${ref}"
+
+                    env.BRANCH_NAME = ref.replace("origin/", "").replace("refs/heads/", "")
+                    echo "Detected Branch: ${env.BRANCH_NAME}"
+                }
             }
         }
 
-        stage('Detect Branch & Deploy') {
+        stage('Checkout Correct Branch') {
+            steps {
+                script {
+                    git branch: "${env.BRANCH_NAME}",
+                        url: 'https://github.com/avikashrana63-source/attendence-project.git'
+                }
+            }
+        }
+
+        stage('Deploy') {
             steps {
                 script {
 
-                    def branch = sh(
-                        script: "git rev-parse --abbrev-ref HEAD",
-                        returnStdout: true
-                    ).trim()
-
-                    echo "Current Branch: ${branch}"
-
-                    if (branch == "main") {
+                    if (env.BRANCH_NAME == "main") {
 
                         echo "Deploying MAIN..."
 
                         sshagent(['server-ssh']) {
                             sh """
-                            ssh -o StrictHostKeyChecking=no ${USER}@${SERVER} '
+                            ssh ${USER}@${SERVER} '
                                 rm -rf /var/www/main &&
                                 mkdir -p /var/www/main &&
                                 chown -R abhi1worker:abhi1worker /var/www/main
                             '
-
-                            scp -o StrictHostKeyChecking=no index.html ${USER}@${SERVER}:/var/www/main/
+                            scp index.html ${USER}@${SERVER}:/var/www/main/
                             """
                         }
 
-                        echo "✅ MAIN deployed → http://${SERVER}:8001"
-
-                    } else if (branch == "dev") {
+                    } else if (env.BRANCH_NAME == "dev") {
 
                         echo "Deploying DEV..."
 
                         sshagent(['server-ssh']) {
                             sh """
-                            ssh -o StrictHostKeyChecking=no ${USER}@${SERVER} '
+                            ssh ${USER}@${SERVER} '
                                 rm -rf /var/www/dev &&
                                 mkdir -p /var/www/dev &&
                                 chown -R abhi1worker:abhi1worker /var/www/dev
                             '
-
-                            scp -o StrictHostKeyChecking=no index.html ${USER}@${SERVER}:/var/www/dev/
+                            scp index.html ${USER}@${SERVER}:/var/www/dev/
                             """
                         }
 
-                        echo "✅ DEV deployed → http://${SERVER}:8002"
+                    } else if (env.BRANCH_NAME == "prefix") {
 
-                    } else if (branch == "prefix") {
-
-                        error("❌ PREFIX branch not allowed for deployment")
+                        error("❌ PREFIX branch not allowed")
 
                     } else {
 
-                        echo "⚠️ Unknown branch — no deployment"
+                        echo "No deployment for this branch"
                     }
                 }
             }
