@@ -14,10 +14,9 @@ pipeline {
             }
         }
 
-        stage('Detect Branch from Webhook') {
+        stage('Detect Branch') {
             steps {
                 script {
-                    // GitHub sends branch like: refs/heads/dev
                     def ref = env.GIT_BRANCH ?: ""
                     echo "Raw branch: ${ref}"
 
@@ -27,12 +26,22 @@ pipeline {
             }
         }
 
-        stage('Checkout Correct Branch') {
+        stage('Checkout Code') {
             steps {
                 script {
                     git branch: "${env.BRANCH_NAME}",
                         url: 'https://github.com/avikashrana63-source/attendence-project.git'
                 }
+            }
+        }
+
+        stage('Build (Show Changes)') {
+            steps {
+                echo "🔨 Building project..."
+            
+                sh "echo '===== index.html content ====='"
+                sh "cat index.html"
+                sh "echo '==============================='"
             }
         }
 
@@ -49,7 +58,7 @@ pipeline {
                             ssh ${USER}@${SERVER} '
                                 rm -rf /var/www/main &&
                                 mkdir -p /var/www/main &&
-                                chown -R abhi1worker:abhi1worker /var/www/main
+                                chown -R ${USER}:${USER} /var/www/main
                             '
                             scp index.html ${USER}@${SERVER}:/var/www/main/
                             """
@@ -57,14 +66,14 @@ pipeline {
 
                     } else if (env.BRANCH_NAME == "dev") {
 
-                        echo "Deploying DEV..."
+                        echo " Deploying DEV..."
 
                         sshagent(['server-ssh']) {
                             sh """
                             ssh ${USER}@${SERVER} '
                                 rm -rf /var/www/dev &&
                                 mkdir -p /var/www/dev &&
-                                chown -R abhi1worker:abhi1worker /var/www/dev
+                                chown -R ${USER}:${USER} /var/www/dev
                             '
                             scp index.html ${USER}@${SERVER}:/var/www/dev/
                             """
@@ -72,11 +81,14 @@ pipeline {
 
                     } else if (env.BRANCH_NAME == "prefix") {
 
-                        error("❌ PREFIX branch not allowed")
+                        echo " PREFIX branch detected"
+                        echo " Build completed"
+                        echo " Changes shown above in logs"
+                        echo " Deployment skipped"
 
                     } else {
 
-                        echo "No deployment for this branch"
+                        echo " No rule for this branch"
                     }
                 }
             }
