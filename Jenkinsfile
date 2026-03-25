@@ -58,9 +58,8 @@ pipeline {
                         sshagent(['server-ssh']) {
                             sh """
                             ssh ${USER}@${SERVER} '
-                                rm -rf /var/www/main &&
-                                mkdir -p /var/www/main &&
-                                chown -R ${USER}:${USER} /var/www/main
+                                rm -rf /var/www/main || true
+                                mkdir -p /var/www/main
                             '
 
                             scp -r * ${USER}@${SERVER}:/var/www/main/
@@ -74,9 +73,8 @@ pipeline {
                         sshagent(['server-ssh']) {
                             sh """
                             ssh ${USER}@${SERVER} '
-                                rm -rf /var/www/dev &&
-                                mkdir -p /var/www/dev &&
-                                chown -R ${USER}:${USER} /var/www/dev
+                                rm -rf /var/www/dev || true
+                                mkdir -p /var/www/dev
                             '
 
                             scp -r * ${USER}@${SERVER}:/var/www/dev/
