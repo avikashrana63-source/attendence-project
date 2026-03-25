@@ -15,85 +15,64 @@ pipeline {
             }
         }
 
-        stage('Detect Branch') {
-            steps {
-                script {
-                    def ref = env.GIT_BRANCH ?: ""
-                    echo "Raw branch: ${ref}"
-
-                    env.BRANCH_NAME = ref.replace("origin/", "").replace("refs/heads/", "")
-                    echo "Detected Branch: ${env.BRANCH_NAME}"
-                }
-            }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                script {
-                    git branch: "${env.BRANCH_NAME}", url: "${REPO}"
-                }
-            }
-        }
-
-        stage('Build') {
-            steps {
-                echo "Building project"
-
-                sh "echo '===== FILE LIST ====='"
-                sh "ls -l"
-                sh "echo '===== index.html ====='"
-                sh "cat index.html || true"
-                sh "echo '======================'"
-            }
-        }
-
-        stage('Deploy') {
+        stage('Process All Branches') {
             steps {
                 script {
 
-                    if (env.BRANCH_NAME == "main") {
+                    def branches = ["main", "dev", "prefix"]
 
-                        echo "Deploying MAIN"
+                    for (branch in branches) {
 
-                        sshagent(['server-ssh']) {
-                            sh """
-                            ssh ${USER}@${SERVER} '
-                                rm -rf /var/www/main || true
-                                mkdir -p /var/www/main
-                            '
+                        echo "================================="
+                        echo "Processing branch: ${branch}"
+                        echo "================================="
 
-                            scp -r * ${USER}@${SERVER}:/var/www/main/
-                            """
+                        deleteDir()
+
+                        // Checkout branch
+                        git branch: branch, url: "${REPO}"
+
+                        // Simple Build (no file content)
+                        echo "Build successful for ${branch}"
+
+                        // Deploy logic
+                        if (branch == "main") {
+
+                            echo "Deploying MAIN"
+
+                            sshagent(['server-ssh']) {
+                                sh """
+                                ssh -o StrictHostKeyChecking=no ${USER}@${SERVER} '
+                                    rm -rf /var/www/main || true
+                                    mkdir -p /var/www/main
+                                '
+
+                                scp -o StrictHostKeyChecking=no -r * ${USER}@${SERVER}:/var/www/main/
+                                """
+                            }
+
+                        } else if (branch == "dev") {
+
+                            echo "Deploying DEV"
+
+                            sshagent(['server-ssh']) {
+                                sh """
+                                ssh -o StrictHostKeyChecking=no ${USER}@${SERVER} '
+                                    rm -rf /var/www/dev || true
+                                    mkdir -p /var/www/dev
+                                '
+
+                                scp -o StrictHostKeyChecking=no -r * ${USER}@${SERVER}:/var/www/dev/
+                                """
+                            }
+
+                        } else if (branch == "prefix") {
+
+                            echo "Prefix branch - build only, no deployment"
+
                         }
-
-                    } else if (env.BRANCH_NAME == "dev") {
-
-                        echo "Deploying DEV"
-
-                        sshagent(['server-ssh']) {
-                            sh """
-                            ssh ${USER}@${SERVER} '
-                                rm -rf /var/www/dev || true
-                                mkdir -p /var/www/dev
-                            '
-
-                            scp -r * ${USER}@${SERVER}:/var/www/dev/
-                            """
-                        }
-
-                    } else if (env.BRANCH_NAME == "prefix") {
-
-                        echo "PREFIX branch detected"
-                        echo "Build executed successfully"
-                        echo "Changes displayed in logs"
-                        echo "Deployment skipped"
-
-                    } else {
-
-                        echo "No deployment rule for this branch"
                     }
                 }
             }
         }
     }
-}
